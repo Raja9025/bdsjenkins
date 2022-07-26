@@ -1,6 +1,6 @@
 #!/bin/bash
 set -x
-deployutil=~/git/bdsjenkins/deployutil
+deployutil=deployfile/deployutil
 
 for deploy in "$(cat microservices.txt)"
 do
