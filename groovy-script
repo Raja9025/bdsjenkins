@@ -17,6 +17,24 @@ pipeline{
                 sh "bash jenkins.sh"
             }
         }
+        
     }
-    
+    post {
+      always {
+        emailext (
+            mimeType: "text/html",
+            to: "s.raja@banyancloud.io, cc:s.raja@banyancloud.io",//cc:ksrinivas@banyancloud.io, cc:murali@banyancloud.io, ",
+            subject: "Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
+            attachLog: true,
+            body:'''<html><body><p>Hii team,<br />
+                                This is Cronjob Image update in Int Cluster</p>
+                         <p>Job_Name:${JOB_NAME}:${BUILD_NUMBER}</a></p>
+                         <p>RESULT: ${BUILD_STATUS}</p>
+                         <p>For any assistance please contact us at: <a href='mailto:DevOps@banyancloud.io'>devops@banyancloud.io</a>.</p>
+                         Warm Regards,<br />
+                         Devops Team'''
+        )
+      }
+  }
+
 }
