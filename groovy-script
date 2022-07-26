@@ -23,7 +23,7 @@ pipeline{
       always {
         emailext (
             mimeType: "text/html",
-            to: "s.raja@banyancloud.io, cc:s.raja@banyancloud.io",//cc:ksrinivas@banyancloud.io, cc:murali@banyancloud.io, ",
+            to: "s.raja@banyancloud.io, cc:s.raja@banyancloud.io, cc:ksrinivas@banyancloud.io, cc:murali@banyancloud.io",
             subject: "Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
             attachLog: true,
             body:'''<html><body><p>Hii team,<br />
