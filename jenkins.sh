@@ -1,6 +1,6 @@
 #!/bin/bash
 set -x
-#deployutil=~/git/bdsjenkins/deployutil
+deployutil=~/git/bdsjenkins/deployutil
 
 for deploy in "$(cat microservices.txt)"
 do
@@ -11,6 +11,6 @@ done
 for image in "$(cat microservices.txt)"
 do
     echo "The Current Images Of Microservice ${image} are:"
-    deployutil -c ${image}
+    ${deployutil} -c ${image}
 done
 
