@@ -11,6 +11,6 @@ done
 for image in "$(cat microservices.txt)"
 do
     echo "The Current Images Of Microservice ${image} are:"
-    ${deployutil} -c ${image}
+    deployutil -c ${image}
 done
 
