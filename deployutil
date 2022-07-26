@@ -1,0 +1,142 @@
+#! /bin/bash
+
+usage()
+{
+  echo "Usage: $0 [ -h | --help ]
+                  [ -c | --compare ] microservice_name
+                  [ -m | --move microservice_name environment custom-image] 
+                  [ -w | --wide microservice_name environment ]
+                  [ -l | --logs microservice_name environment ]
+                  [ -d | --describe microservice_name environment resource]
+                  [ -e | --env microservice_name environment]"
+  exit
+}
+
+get_dev_image()
+{
+        /usr/local/bin/kubectl get deployments.v1.apps -n $1-ns --kubeconfig ~/.kube/config_dev_239 -o jsonpath='{.items[0].spec.template.spec.containers[0].image}'
+}
+
+get_staging_image()
+{
+        /usr/local/bin/kubectl get deployments.v1.apps -n $1-ns --kubeconfig ~/.kube/config_stage_aws -o jsonpath='{.items[0].spec.template.spec.containers[0].image}' 2> /dev/null
+}
+
+get_int_image()
+{
+        /usr/local/bin/kubectl get deployments.v1.apps -n $1-ns --kubeconfig ~/.kube/config_qa_248 -o jsonpath='{.items[0].spec.template.spec.containers[0].image}'
+}
+
+copy_dev_to_int_stage()
+{
+        if [ ! -z $3 ]
+        then
+                image=$3
+        else
+                image=$(get_dev_image $1)
+        fi
+        echo "Reference image is : $image"
+        current_image=$(get_$2_image $1)
+        echo "Current image is: $current_image"
+        echo
+
+        if [[ "$current_image" == "$image" ]]
+        then
+                echo "Images are already synced.."
+                exit 0
+        fi
+
+        dev_repo=`echo $image | cut -d":" -f1`
+        dev_tag=`echo $image | cut -d":" -f2`
+        cd ~/git/Titan_HelmCharts/$1
+        git pull
+        printf " ================ $date ================ " >> ~/microservice_logs/$1-$2.log
+        python3 ~/git/devops_automation/dev_to_int_or_stage_deploy.py -m $1 -e $2 >> ~/microservice_logs/$1-$2.log
+
+        if [[ $? -ne 0 ]]
+        then
+                echo "changing ENV variables failed"
+                exit 1
+        fi
+        if [[ $2 == *"staging"* ]]
+        then
+                echo "Syncing the given/dev docker image to staging..."
+                /usr/sbin/helm upgrade --install --set imageCredentials.password=5fa9863a1cd6ba680f7b8c5105853c0408daefa8 --set image.repository=$dev_repo --set image.tag=$dev_tag $1 ~/git/Titan_HelmCharts/$1 --namespace $1-ns --create-namespace --kubeconfig ~/.kube/config_stage_aws -f ~/git/Titan_HelmCharts/$1/values-stage.yaml
+        elif [[ $2 == *"int"* ]]
+        then
+                echo "Syncing the dev docker image to  int"
+                /usr/sbin/helm upgrade --install --set imageCredentials.password=5fa9863a1cd6ba680f7b8c5105853c0408daefa8 --set image.repository=$dev_repo --set image.tag=$dev_tag $1 ~/git/Titan_HelmCharts/$1 --namespace $1-ns --create-namespace --kubeconfig ~/.kube/config_qa_248 -f ~/git/Titan_HelmCharts/$1/values-qa.yaml
+        else
+                echo "Only staging or int allowed"
+        fi
+
+        if [[ $(git status --porcelain) ]]
+        then
+                echo "Changes to the $1 helmcharts will be pushed to git"
+                git status --porcelain
+                git add .
+                git commit -m "Commiting changes to helmcharts stage or qa $dev_tag"
+                git push -u origin
+        fi
+        cd ..
+}
+
+get_wide_output()
+{
+        /usr/local/bin/kubectl get all -n $1-ns --kubeconfig ~/.kube/$2 -o=wide
+}
+
+get_describe()
+{
+        /usr/local/bin/kubectl describe $3 -n $1-ns --kubeconfig ~/.kube/$2
+}
+
+get_logs()
+{
+        pod=/usr/local/bin/kubectl get pods -n $1-ns --kubeconfig ~/.kube/$2 -o jsonpath="{.items[0].metadata.name}"
+        /usr/local/bin/kubectl logs $pod -n $1-ns --kubeconfig ~/.kube/$2 -c $1
+        sleep 2
+        /usr/local/bin/kubectl logs $pod -n $1-ns --kubeconfig ~/.kube/$2 -c sidecar-log
+
+}
+get_env()
+{
+        /usr/local/bin/kubectl get pods -n $1-ns --kubeconfig ~/.kube/$2 -o jsonpath="{.items[0].spec.containers[0].env}" | jq
+}
+
+PARSED_ARGUMENTS=$(getopt -a -n alphabet -o hl:c:w:d:m:e: --long help,list:,copy:,wide:,describe:,move:,env:, -- "$@")
+VALID_ARGUMENTS=$?
+if [ "$VALID_ARGUMENTS" != "0" ]
+then
+        usage
+fi
+
+eval set -- "$PARSED_ARGUMENTS"
+
+option=$1
+microservice=$2
+shift
+env=$3
+
+if [[ $env == *"stag"* ]]
+then
+        config=config_stage_aws
+elif [[ $env == *"dev"* ]]
+then
+        config=config_dev_239
+elif [[ $env == *"int"* ]]
+then
+        config=config_qa_248
+fi
+
+case "$option" in
+        -h | --help)   usage;;
+        -c | --compare)   echo "Dev -- $(get_dev_image $microservice)"; echo "Int -- $(get_int_image $microservice)"; echo "Stage -- $(get_staging_image $microservice)"; exit;;
+        -m | --move)   image=$4; copy_dev_to_int_stage $microservice $env $image; exit;;
+        -w | --wide)   get_wide_output $microservice $config; exit;;
+        -l | --logs)   get_logs $microservice $config; exit;;
+        -d | --describe) resource=$4; get_describe $microservice $config $resource; exit;;
+        -e | --env)   get_env $microservice $config; exit;;
+        #--) shift; break ;;
+         *) echo "Unexpected option: $1 - this should not happen." ; usage ;;
+esac
