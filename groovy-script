@@ -1,0 +1,22 @@
+pipeline{
+    agent{
+         label "jenkins-slave"
+    }
+     options {
+    disableConcurrentBuilds abortPrevious: true
+     }
+    stages{
+        stage('cloning from git'){
+          steps{
+            git credentialsId: 'github', 
+            url: 'https://github.com/Raja9025/bdsjenkins'
+            }
+        }
+        stage('execute script file'){
+            steps{
+                sh "bash jenkins.sh"
+            }
+        }
+    }
+    
+}

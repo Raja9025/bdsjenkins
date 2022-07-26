@@ -5,8 +5,8 @@ services=( 'aws-collector' 'dtcs-mysql' 'dtcscol-mysql' 'dtcs-pgsql' 'dtcscol-pg
 
 for deploy in "${services[@]}"
 do
-    #${deployutil} -m ${deploy} int
-     echo ${deploy}
+    ${deployutil} -m ${deploy} int
+    # echo ${deploy}
 done
 
 for image in "${services[@]}"
